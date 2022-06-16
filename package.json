@@ -1,8 +1,11 @@
 {
-  "name": "pino-sentry",
+  "name": "@swimm/pino-sentry",
   "description": "@sentry/node transport for pino logger",
-  "version": "0.11.0",
+  "version": "0.12.0+swimm",
   "author": "Andrew Avdeev <andrewww.avdeev@gmail.com>",
+  "maintainers": [
+    "Swimm <support@swimm.io>"
+  ],
   "keywords": [
     "logger",
     "loggly",
@@ -25,12 +28,12 @@
     "test": "jest",
     "prepublishOnly": "npm run lint && npm run build && npm run test"
   },
-  "repository": "https://github.com/aandrewww/pino-sentry.git",
+  "repository": "https://github.com/swimm/pino-sentry.git",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/aandrewww/pino-sentry/issues"
+    "url": "https://github.com/swimm/pino-sentry/issues"
   },
-  "homepage": "https://github.com/aandrewww/pino-sentry#readme",
+  "homepage": "https://github.com/swimm/pino-sentry#readme",
   "engines": {
     "node": ">=10"
   },

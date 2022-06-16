@@ -6,6 +6,9 @@
 
 Load [pino](https://github.com/pinojs/pino) logs into [Sentry](https://sentry.io/)
 
+> **Note**
+> This is a fork with [aandrewww/pino-sentry#46](https://github.com/aandrewww/pino-sentry/pull/46) & [aandrewww/pino-sentry/pull#47](https://github.com/aandrewww/pino-sentry/pull/47) merged.
+
 ## Index
 
 - [Install](#install)
