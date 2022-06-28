@@ -1,7 +1,7 @@
 {
   "name": "@swimm/pino-sentry",
   "description": "@sentry/node transport for pino logger",
-  "version": "0.12.0+swimm",
+  "version": "0.12.2+swimm",
   "author": "Andrew Avdeev <andrewww.avdeev@gmail.com>",
   "maintainers": [
     "Swimm <support@swimm.io>"
