@@ -119,42 +119,43 @@ export class PinoSentryTransport {
         if(chunk[key] !== undefined) {
           extra[key] = chunk[key];
         }
-        const message = get(chunk, this.messageAttributeKey);
-        const stack = get(chunk, this.stackAttributeKey) || '';
-
-        const scope = new Sentry.Scope();
-        this.decorateScope(chunk, scope);
-
-        scope.setLevel(severity);
-
-        if (this.isObject(tags)) {
-          Object.keys(tags).forEach(tag => scope.setTag(tag, tags[tag]));
-        }
-
-        if (this.isObject(extra)) {
-          Object.keys(extra).forEach(ext => scope.setExtra(ext, extra[ext]));
-        }
-
-        if (this.isObject(breadcrumbs)) {
-          Object.values(breadcrumbs).forEach(breadcrumb => scope.addBreadcrumb(breadcrumb));
-        }
-
-        // Capturing Errors / Exceptions
-        if (this.isSentryException(severity)) {
-          const error = message instanceof Error ? message : new ExtendedError({ message, stack });
-
-          setImmediate(() => {
-            Sentry.captureException(error, scope);
-            cb();
-          });
-        } else {
-          // Capturing Messages
-          setImmediate(() => {
-            Sentry.captureMessage(message, scope);
-            cb();
-          });
-        }
       });
+
+      const message = get(chunk, this.messageAttributeKey);
+      const stack = get(chunk, this.stackAttributeKey) || '';
+
+      const scope = new Sentry.Scope();
+      this.decorateScope(chunk, scope);
+
+      scope.setLevel(severity);
+
+      if (this.isObject(tags)) {
+        Object.keys(tags).forEach(tag => scope.setTag(tag, tags[tag]));
+      }
+
+      if (this.isObject(extra)) {
+        Object.keys(extra).forEach(ext => scope.setExtra(ext, extra[ext]));
+      }
+
+      if (this.isObject(breadcrumbs)) {
+        Object.values(breadcrumbs).forEach(breadcrumb => scope.addBreadcrumb(breadcrumb));
+      }
+
+      // Capturing Errors / Exceptions
+      if (this.isSentryException(severity)) {
+        const error = message instanceof Error ? message : new ExtendedError({ message, stack });
+
+        setImmediate(() => {
+          Sentry.captureException(error, scope);
+          cb();
+        });
+      } else {
+        // Capturing Messages
+        setImmediate(() => {
+          Sentry.captureMessage(message, scope);
+          cb();
+        });
+      }
     });
   }
 
