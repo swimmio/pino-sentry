@@ -1,4 +1,5 @@
 import stream  from 'stream';
+import { AsyncResource } from 'async_hooks';
 import split from 'split2';
 import Pump from 'pumpify';
 import through from 'through2';
@@ -88,71 +89,74 @@ export class PinoSentryTransport {
     });
   }
 
-  public prepareAndGo(chunk: any, cb: any): void {
-    const severity = this.getLogSeverity(chunk.level);
+  public prepareAndGo(chunkInfo: ChunkInfo, cb: any): void {
+    chunkInfo.run((chunk) => {
+      const severity = this.getLogSeverity(chunk.level);
 
-    // Check if we send this Severity to Sentry
-    if (!this.shouldLog(severity)) {
-      setImmediate(cb);
-      return;
-    }
+      // Check if we send this Severity to Sentry
+      if (!this.shouldLog(severity)) {
+        setImmediate(cb);
+        return;
+      }
 
-    const tags = chunk.tags || {};
-    const breadcrumbs: Breadcrumb[] = chunk.breadcrumbs || {};
+      const tags = chunk.tags || {};
+      const breadcrumbs: Breadcrumb[] = chunk.breadcrumbs || {};
 
-    if (chunk.reqId) {
-      tags.uuid = chunk.reqId;
-    }
+      if (chunk.reqId) {
+        tags.uuid = chunk.reqId;
+      }
 
-    if (chunk.responseTime) {
-      tags.responseTime = chunk.responseTime;
-    }
+      if (chunk.responseTime) {
+        tags.responseTime = chunk.responseTime;
+      }
 
-    if (chunk.hostname) {
-      tags.hostname = chunk.hostname;
-    }
+      if (chunk.hostname) {
+        tags.hostname = chunk.hostname;
+      }
 
-    const extra: any = {};
-    this.extraAttributeKeys.forEach((key: string) => {
-      if(chunk[key] !== undefined) {
-        extra[key] = chunk[key];
+      const extra: any = {};
+      this.extraAttributeKeys.forEach((key: string) => {
+        if(chunk[key] !== undefined) {
+          extra[key] = chunk[key];
+        }
+      });
+
+      const message: any & Error = get(chunk, this.messageAttributeKey);
+      const stack = get(chunk, this.stackAttributeKey) || '';
+
+      const scope = new Sentry.Scope();
+      this.decorateScope(chunk, scope);
+
+      scope.setLevel(severity);
+
+      if (this.isObject(tags)) {
+        Object.keys(tags).forEach(tag => scope.setTag(tag, tags[tag]));
+      }
+
+      if (this.isObject(extra)) {
+        Object.keys(extra).forEach(ext => scope.setExtra(ext, extra[ext]));
+      }
+
+      if (this.isObject(breadcrumbs)) {
+        Object.values(breadcrumbs).forEach(breadcrumb => scope.addBreadcrumb(breadcrumb));
+      }
+
+      // Capturing Errors / Exceptions
+      if (this.isSentryException(severity)) {
+        const error = message instanceof Error ? message : new ExtendedError({ message, stack });
+
+        setImmediate(() => {
+          Sentry.captureException(error, scope);
+          cb();
+        });
+      } else {
+        // Capturing Messages
+        setImmediate(() => {
+          Sentry.captureMessage(message, scope);
+          cb();
+        });
       }
     });
-    const message: any & Error = get(chunk, this.messageAttributeKey);
-    const stack = get(chunk, this.stackAttributeKey) || '';
-
-    const scope = new Sentry.Scope();
-    this.decorateScope(chunk, scope);
-
-    scope.setLevel(severity);
-
-    if (this.isObject(tags)) {
-      Object.keys(tags).forEach(tag => scope.setTag(tag, tags[tag]));
-    }
-
-    if (this.isObject(extra)) {
-      Object.keys(extra).forEach(ext => scope.setExtra(ext, extra[ext]));
-    }
-
-    if (this.isObject(breadcrumbs)) {
-      Object.values(breadcrumbs).forEach(breadcrumb => scope.addBreadcrumb(breadcrumb));
-    }
-
-    // Capturing Errors / Exceptions
-    if (this.isSentryException(severity)) {
-      const error = message instanceof Error ? message : new ExtendedError({ message, stack });
-
-      setImmediate(() => {
-        Sentry.captureException(error, scope);
-        cb();
-      });
-    } else {
-      // Capturing Messages
-      setImmediate(() => {
-        Sentry.captureMessage(message, scope);
-        cb();
-      });
-    }
   }
 
   private validateOptions(options: PinoSentryOptions): PinoSentryOptions {
@@ -208,6 +212,20 @@ export class PinoSentryTransport {
   }
 }
 
+class ChunkInfo extends AsyncResource {
+  constructor(private readonly chunk: any) {
+    super("ChunkInfo");
+  }
+
+  run<T extends readonly unknown[], R>(callback: (...args: any[]) => R, ...args: T): R {
+    try {
+      return this.runInAsyncScope(callback, undefined, this.chunk, ...args);
+    } finally {
+      this.emitDestroy();
+    }
+  }
+}
+
 export function createWriteStream(options?: PinoSentryOptions): stream.Duplex {
   const transport = new PinoSentryTransport(options);
   const sentryTransformer = transport.transformer();
@@ -215,7 +233,7 @@ export function createWriteStream(options?: PinoSentryOptions): stream.Duplex {
   return new Pump(
     split((line) => {
       try {
-        return JSON.parse(line);
+        return new ChunkInfo(JSON.parse(line));
       } catch (e) {
         // Returning undefined will not run the sentryTransformer
         return;
